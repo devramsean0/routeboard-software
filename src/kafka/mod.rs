@@ -2,6 +2,8 @@ use rdkafka::{ClientConfig, Message, consumer::{Consumer, StreamConsumer}};
 use tokio::sync::broadcast;
 use log::{info, error, debug};
 
+use crate::state::Event;
+
 mod messages;
 
 pub async fn run_kafka_consumer(
@@ -43,6 +45,7 @@ pub async fn run_kafka_consumer(
                         if let Some(payload) = msg.payload_view::<str>() {
                             if let Ok(text) = payload {
                                 let messages: messages::Container = serde_json::from_str(text).unwrap();
+                                let mut events: Vec<Event> = vec![];
                                 for msg in messages {
                                     if msg.header.msg_type != "0003" {
                                         debug!("Discarded Message with type {}", msg.header.msg_type);
@@ -64,8 +67,24 @@ pub async fn run_kafka_consumer(
                                     let matched_crs = matched_loc.crs.clone().unwrap();
                                     if matched_crs == String::from(" ") {
                                         debug!("Discarded Message because not a station");
+                                        continue;
                                     }
                                     debug!("Processing train {} to matched CRS {}", train_id, matched_crs);
+
+                                    if body.event_type == Some(String::from("ARRIVAL")) {
+                                        events.push(Event::Arrived { train_id: train_id.clone(), crs: matched_crs.clone() });
+                                    }
+                                    if body.event_type == Some(String::from("DEPARTURE")) {
+                                        events.push(Event::Arrived { train_id: train_id.clone(), crs: matched_crs.clone() });
+                                    }
+                                    if body.event_type == Some(String::from("DEPARTURE")) {
+                                        events.push(Event::Deactivated { train_id });
+                                    }
+                                }
+
+                                let mut state_guard = state.write().unwrap();
+                                for event in &events {
+                                    state_guard.map.apply(event);
                                 }
                             }
                         }

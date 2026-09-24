@@ -44,22 +44,10 @@ pub struct TiplocData {
 
 #[derive(serde::Deserialize)]
 pub struct LocationEntry {
-    #[serde(rename = "NLC")]
-    pub nlc: i64,
     #[serde(rename = "STANOX")]
     pub stanox: Option<String>,
-    #[serde(rename = "TIPLOC")]
-    pub tiploc: Option<String>,
     #[serde(rename = "3ALPHA")]
     pub crs: Option<String>,
-    #[serde(rename = "UIC")]
-    pub uic: Option<String>,
-    #[serde(rename = "NLCDESC")]
-    pub nlcdesc: Option<String>,
-    #[serde(rename = "AXIS/ACRES")]
-    pub axis: Option<String>,
-    #[serde(rename = "NLCDESC16")]
-    pub nlcdesc16: Option<String>,
 }
 
 async fn decide_on_download() -> anyhow::Result<bool> {

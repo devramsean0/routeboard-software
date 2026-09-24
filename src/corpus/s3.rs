@@ -1,5 +1,5 @@
 use s3::{
-    types::{GetObjectOutput, HeadObjectOutput, ListObjectsV2Output},
+    types::{GetObjectOutput, HeadObjectOutput},
     Auth, Client,
 };
 

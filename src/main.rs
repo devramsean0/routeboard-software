@@ -15,7 +15,8 @@ async fn main() -> std::io::Result<()> {
     let corpus_data = corpus::update_corpus().await.unwrap();
 
     let state: state::SharedState = Arc::new(RwLock::new(state::AppState {
-        corpus: corpus_data
+        corpus: corpus_data,
+        map: state::StationMap::default()
     }));
 
     let host = std::env::var("HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
