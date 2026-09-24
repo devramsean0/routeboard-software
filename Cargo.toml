@@ -1,0 +1,25 @@
+[package]
+authors = ["Sean Outram <me@sean.cyou>"]
+edition = "2021"
+# If you change the name here, you must also do it in flake.nix (and run `cargo generate-lockfile` afterwards)
+name = "routeboard-software"
+description = "A simple Rust project using Nix"
+version = "0.1.0"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+actix-web = "4.15.0"
+anyhow = "1.0.104"
+clap = { version = "4.3.14", features = ["derive"] }
+dotenv = "0.15.0"
+env_logger = "0.11.11"
+flate2 = "1.1.10"
+futures = "0.3.34"
+log = "0.4.34"
+md5 = "0.8.1"
+rdkafka = { version = "0.39.0", features = ["ssl"] }
+s3 = "0.1.36"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+tokio = { version = "1.53.1", features = ["full"] }
