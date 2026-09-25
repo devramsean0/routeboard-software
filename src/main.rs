@@ -1,13 +1,35 @@
-use actix_web::{web, App, HttpServer};
+use actix_web::{App, HttpResponse, HttpServer, get, web};
+use serde::Serialize;
 use tokio::sync::broadcast;
 use log::info;
 use std::sync::{Arc, RwLock};
 use std::collections::HashMap;
 
+use crate::state::SharedState;
+
 mod kafka;
 mod corpus;
 mod state;
 mod output_config;
+
+
+#[get("/output")]
+pub async fn get_output(state: web::Data<SharedState>) -> HttpResponse {
+    let state = state.read().unwrap();
+    HttpResponse::Ok().json(OutputConfigResponse {
+    strings: output_config::OUTPUT_CONFIG
+            .strings
+            .iter()
+            .map(|strings| {
+                strings
+                    .elements
+                    .iter()
+                    .map(|element| state.map.train_count(element.crs))
+                    .collect()
+            })
+            .collect(),
+    })
+}
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -60,7 +82,7 @@ async fn main() -> std::io::Result<()> {
     let server = HttpServer::new(move || {
         App::new()
             .app_data(web::Data::new(state.clone()))
-            .configure(output_config::configure)
+            .service(get_output)
     })
     .bind((host, port))?
     .run();
@@ -79,4 +101,9 @@ async fn main() -> std::io::Result<()> {
     });
 
     server.await
+}
+
+#[derive(Serialize)]
+pub struct OutputConfigResponse {
+    strings: Vec<Vec<usize>>,
 }

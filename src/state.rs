@@ -94,8 +94,4 @@ impl StationMap {
     pub fn train_count(&self, crs: &str) -> usize {
         self.counts.get(crs).copied().unwrap_or(0)
     }
- 
-    pub fn is_occupied(&self, crs: &str) -> bool {
-        self.train_count(crs) > 0
-    }
 }
