@@ -19,5 +19,6 @@ pub struct Body {
     pub current_train_id: Option<String>,
     pub loc_stanox: Option<String>,
     pub event_type: Option<String>,
-    pub train_terminated: Option<String>
+    pub train_terminated: Option<String>,
+    pub actual_timestamp: Option<String>,
 }

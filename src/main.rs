@@ -1,11 +1,13 @@
-use actix_web::{App, HttpServer};
+use actix_web::{web, App, HttpServer};
 use tokio::sync::broadcast;
 use log::info;
 use std::sync::{Arc, RwLock};
+use std::collections::HashMap;
 
 mod kafka;
 mod corpus;
 mod state;
+mod output_config;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -13,9 +15,28 @@ async fn main() -> std::io::Result<()> {
     env_logger::init_from_env(env_logger::Env::new().default_filter_or("info"));
 
     let corpus_data = corpus::update_corpus().await.unwrap();
+    let station_lookup = Arc::new(
+        corpus_data
+            .tiplocdata
+            .iter()
+            .filter_map(|entry| {
+                let Some(stanox) = entry.stanox.as_ref() else {
+                    return None;
+                };
+                let Some(crs) = entry.crs.as_ref() else {
+                    return None;
+                };
+                if crs == " " {
+                    return None;
+                }
+                Some((stanox.clone(), crs.clone()))
+            })
+            .collect::<HashMap<String, String>>()
+    );
 
     let state: state::SharedState = Arc::new(RwLock::new(state::AppState {
-        corpus: corpus_data,
+        //corpus: corpus_data,
+        station_lookup,
         map: state::StationMap::default()
     }));
 
@@ -38,7 +59,8 @@ async fn main() -> std::io::Result<()> {
     // Start Actix-Web
     let server = HttpServer::new(move || {
         App::new()
-            .app_data(state.clone())
+            .app_data(web::Data::new(state.clone()))
+            .configure(output_config::configure)
     })
     .bind((host, port))?
     .run();
