@@ -11,63 +11,85 @@ mod messages;
 fn message_to_events(
     msg: messages::SingleContainer,
     station_lookup: &std::collections::HashMap<String, String>,
-    stale_cutoff: u128,
+    _stale_cutoff: u128,
 ) -> Vec<Event> {
-    if msg.header.msg_type != "0003" {
-        debug!("Discarded Message with type {}", msg.header.msg_type);
-        return Vec::new();
+    match msg.header.msg_type.as_str() {
+        "0002" => {
+            let Some(canx_timestamp) = msg.body.canx_timestamp.as_deref() else {
+                debug!("Discarded Message without actual timestamp");
+                return Vec::new();
+            };
+
+            let Ok(message_time) = canx_timestamp.trim().parse::<u128>() else {
+                debug!("Discarded Message with invalid actual timestamp");
+                return Vec::new();
+            };
+
+            let body = msg.body;
+
+            let train_id = body.current_train_id.unwrap_or(body.train_id);
+            let mut events = Vec::new();
+
+            events.push(Event::Deactivated {
+                    train_id,
+                    timestamp: message_time,
+            });
+
+            events
+        }
+        "0003" => {
+            let Some(actual_timestamp) = msg.body.actual_timestamp.as_deref() else {
+                debug!("Discarded Message without actual timestamp");
+                return Vec::new();
+            };
+
+            let Ok(message_time) = actual_timestamp.trim().parse::<u128>() else {
+                debug!("Discarded Message with invalid actual timestamp");
+                return Vec::new();
+            };
+
+            let body = msg.body;
+            let Some(loc_stanox) = body.loc_stanox.as_deref() else {
+                return Vec::new();
+            };
+
+            let Some(matched_crs) = station_lookup.get(loc_stanox).cloned() else {
+                return Vec::new();
+            };
+
+            if matched_crs == " " {
+                debug!("Discarded Message because not a station");
+                return Vec::new();
+            }
+
+            let train_id = body.current_train_id.unwrap_or(body.train_id);
+            let mut events = Vec::new();
+
+            debug!("Processing train {} to matched CRS {}", train_id, matched_crs);
+
+            if body.event_type.as_deref() == Some("ARRIVAL") {
+                events.push(Event::Arrived {
+                    train_id: train_id.clone(),
+                    crs: matched_crs,
+                    timestamp: message_time,
+                });
+            }
+            if body.event_type.as_deref() == Some("DEPARTURE") {
+                events.push(Event::Departed {
+                    train_id: train_id.clone(),
+                    timestamp: message_time,
+                });
+            }
+            if body.train_terminated.as_deref() == Some("true") {
+                events.push(Event::Deactivated {
+                    train_id,
+                    timestamp: message_time,
+                });
+            }
+            events
+        }
+        _ => { vec![] }
     }
-
-    let Some(actual_timestamp) = msg.body.actual_timestamp.as_deref() else {
-        debug!("Discarded Message without actual timestamp");
-        return Vec::new();
-    };
-
-    let Ok(message_time) = actual_timestamp.trim().parse::<u128>() else {
-        debug!("Discarded Message with invalid actual timestamp");
-        return Vec::new();
-    };
-
-    let body = msg.body;
-    let Some(loc_stanox) = body.loc_stanox.as_deref() else {
-        return Vec::new();
-    };
-
-    let Some(matched_crs) = station_lookup.get(loc_stanox).cloned() else {
-        return Vec::new();
-    };
-
-    if matched_crs == " " {
-        debug!("Discarded Message because not a station");
-        return Vec::new();
-    }
-
-    let train_id = body.current_train_id.unwrap_or(body.train_id);
-    let mut events = Vec::with_capacity(2);
-
-    debug!("Processing train {} to matched CRS {}", train_id, matched_crs);
-
-    if body.event_type.as_deref() == Some("ARRIVAL") {
-        events.push(Event::Arrived {
-            train_id: train_id.clone(),
-            crs: matched_crs,
-            timestamp: message_time,
-        });
-    }
-    if body.event_type.as_deref() == Some("DEPARTURE") {
-        events.push(Event::Departed {
-            train_id: train_id.clone(),
-            timestamp: message_time,
-        });
-    }
-    if body.train_terminated.as_deref() == Some("true") {
-        events.push(Event::Deactivated {
-            train_id,
-            timestamp: message_time,
-        });
-    }
-
-    events
 }
 
 pub async fn run_kafka_consumer(

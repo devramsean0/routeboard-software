@@ -21,4 +21,5 @@ pub struct Body {
     pub event_type: Option<String>,
     pub train_terminated: Option<String>,
     pub actual_timestamp: Option<String>,
+    pub canx_timestamp: Option<String> // Timestamp for Cancellation
 }
