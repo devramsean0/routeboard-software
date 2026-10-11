@@ -1,23 +1,22 @@
-use actix_web::{App, HttpResponse, HttpServer, get, web};
-use serde::Serialize;
-use tokio::sync::broadcast;
+use actix_web::{get, web, App, HttpResponse, HttpServer};
 use log::info;
-use std::sync::{Arc, RwLock};
+use serde::Serialize;
 use std::collections::HashMap;
+use std::sync::{Arc, RwLock};
+use tokio::sync::broadcast;
 
 use crate::state::SharedState;
 
-mod kafka;
 mod corpus;
-mod state;
+mod kafka;
 mod output_config;
-
+mod state;
 
 #[get("/output")]
 pub async fn get_output(state: web::Data<SharedState>) -> HttpResponse {
     let state = state.read().unwrap();
     HttpResponse::Ok().json(OutputConfigResponse {
-    strings: output_config::OUTPUT_CONFIG
+        strings: output_config::OUTPUT_CONFIG
             .strings
             .iter()
             .map(|strings| {
@@ -53,13 +52,13 @@ async fn main() -> std::io::Result<()> {
                 }
                 Some((stanox.clone(), crs.clone()))
             })
-            .collect::<HashMap<String, String>>()
+            .collect::<HashMap<String, String>>(),
     );
 
     let state: state::SharedState = Arc::new(RwLock::new(state::AppState {
         //corpus: corpus_data,
         station_lookup,
-        map: state::StationMap::default()
+        map: state::StationMap::default(),
     }));
 
     let host = std::env::var("HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
@@ -73,9 +72,8 @@ async fn main() -> std::io::Result<()> {
     // Spawn the Kafka Listener Thread
     tokio::spawn(kafka::run_kafka_consumer(
         shutdown_tx.subscribe(),
-        state.clone()
+        state.clone(),
     ));
-
 
     info!("Starting Actix web server on http://{host}:{port}");
     // Start Actix-Web
@@ -92,10 +90,10 @@ async fn main() -> std::io::Result<()> {
     tokio::spawn(async move {
         tokio::signal::ctrl_c().await.ok();
         info!("Shutdown signal received. Stopping services...");
-        
+
         // Signal Kafka consumer to stop
         let _ = shutdown_tx.send(());
-        
+
         // Stop Actix server gracefully (wait for in-flight requests)
         server_handle.stop(true).await;
     });

@@ -1,8 +1,11 @@
-use std::{fs::{self, File}, io::{BufReader, Read}};
-use log::{debug, info};
 use flate2::read::GzDecoder;
-use rdkafka::message::ToBytes;
 use futures::TryStreamExt;
+use log::{debug, info};
+use rdkafka::message::ToBytes;
+use std::{
+    fs::{self, File},
+    io::{BufReader, Read},
+};
 
 mod s3;
 
