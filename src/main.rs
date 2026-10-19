@@ -61,11 +61,7 @@ async fn main() -> std::io::Result<()> {
         map: state::StationMap::default(),
     }));
 
-    let host = std::env::var("HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
-    let port = std::env::var("PORT")
-        .unwrap_or_else(|_| "3000".to_string())
-        .parse::<u16>()
-        .unwrap_or(3000);
+    let host = std::env::var("ADDR").unwrap_or_else(|_| "127.0.0.1:3000".to_string());
 
     let (shutdown_tx, _) = broadcast::channel::<()>(1);
 
@@ -75,14 +71,14 @@ async fn main() -> std::io::Result<()> {
         state.clone(),
     ));
 
-    info!("Starting Actix web server on http://{host}:{port}");
+    info!("Starting Actix web server on http://{host}");
     // Start Actix-Web
     let server = HttpServer::new(move || {
         App::new()
             .app_data(web::Data::new(state.clone()))
             .service(get_output)
     })
-    .bind((host, port))?
+    .bind(host)?
     .run();
 
     // Listen for Ctrl+C concurrently with the server execution
