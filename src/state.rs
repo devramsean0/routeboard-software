@@ -7,8 +7,10 @@ pub type SharedState = Arc<RwLock<AppState>>;
 
 pub const MAX_TRAIN_AGE: Duration = Duration::from_mins(20);
 
-/// Minimum gap between expiry sweeps. The sweep is a full scan, and `apply` runs per event.
 const EXPIRY_INTERVAL: Duration = Duration::from_secs(30);
+
+const MIN_PLAUSIBLE_TIMESTAMP: u128 = 946_684_800_000; // 2000-01-01T00:00:00Z
+const MAX_PLAUSIBLE_TIMESTAMP: u128 = 4_102_444_800_000; // 2100-01-01T00:00:00Z
 
 pub struct AppState {
     //pub corpus: crate::corpus::TiplocData,
@@ -82,6 +84,11 @@ impl StationMap {
     pub fn apply(&mut self, event: &Event) {
         let train_id = event.train_id();
         let timestamp = event.timestamp();
+
+        if !(MIN_PLAUSIBLE_TIMESTAMP..=MAX_PLAUSIBLE_TIMESTAMP).contains(&timestamp) {
+            debug!("Ignoring {train_id} event with implausible timestamp {timestamp}");
+            return;
+        }
 
         if timestamp > self.feed_clock {
             self.feed_clock = timestamp;
@@ -456,6 +463,34 @@ mod tests {
         assert_eq!((released, forgotten), (1, 1));
         assert_eq!(map.train_count("MAN"), 0);
         assert_eq!(map.train_count("SPT"), 1, "T3 is still fresh");
+        map.assert_balanced();
+    }
+
+    /// The production symptom this guards against: a single malformed/out-of-range
+    /// timestamp shoves the feed clock far into the future. Every genuine, well-formed
+    /// event that arrives afterwards is then judged to be "older than the window" relative
+    /// to that bogus clock, so the board stops updating even though data keeps flowing in.
+    #[test]
+    fn one_corrupt_future_timestamp_does_not_block_future_updates() {
+        let t = BASE;
+        let mut map = StationMap::default();
+
+        map.apply(&arrived("T1", "MAN", t));
+
+        // A single bad record: e.g. nanoseconds mistaken for milliseconds, landing
+        // somewhere around the year 57000 rather than on any real calendar date.
+        let corrupt_timestamp = t * 1_000_000;
+        map.apply(&arrived("BAD", "SPT", corrupt_timestamp));
+
+        // Normal service resumes: a legitimate arrival shortly after T1's.
+        map.apply(&arrived("T2", "LDS", t + MINUTE));
+
+        assert_eq!(
+            map.train_count("LDS"),
+            1,
+            "a legitimate arrival must not be rejected just because an earlier bad \
+             record poisoned the feed clock"
+        );
         map.assert_balanced();
     }
 
